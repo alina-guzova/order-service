@@ -1,6 +1,46 @@
+server:
+  port: 8082
+
 spring:
   application:
     name: order-service
+  profiles:
+    active: local
+
+  datasource:
+    hikari:
+      connection-timeout: 5000
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+feign:
+  circuitbreaker:
+    enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      userServiceClient:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50.0
+        slowCallRateThreshold: 50.0
+        slowCallDurationThreshold: 5s
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - feign.FeignException.InternalServerError
+          - java.net.ConnectException
+          - java.util.concurrent.TimeoutException
+        ignoreExceptions:
+          - com.inno.orderservice.exception.BaseAppException
+
+
 
 logging:
   pattern:

@@ -1,0 +1,42 @@
+services:
+  order-service-db:
+    image: postgres:17-alpine
+    container_name: order-service-db-container
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-order_service_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - pgdata_order:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-order_service_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order-service-app
+    ports:
+      - "${APP_PORT:-8082}:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-docker}
+      DB_HOST: order-service-db
+      DB_NAME: ${POSTGRES_DB:-order_service_db}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    depends_on:
+      order-service-db:
+        condition: service_healthy
+
+volumes:
+  pgdata_order:
+
+networks:
+  default:
+    name: microservices-net
+    external: true

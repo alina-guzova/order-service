@@ -1,7 +1,8 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.1.0'
+	id 'org.springframework.boot' version '3.4.2'
 	id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 group = 'com.inno'
@@ -17,22 +18,79 @@ repositories {
 	mavenCentral()
 }
 
+ext {
+    set('springCloudVersion', "2024.0.0")
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
 
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
+    implementation 'org.liquibase:liquibase-core'
     runtimeOnly 'org.postgresql:postgresql'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.wiremock:wiremock-standalone:3.12.1'
+}
+
+spotless {
+    java {
+        googleJavaFormat()
+        removeUnusedImports()
+    }
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "PASSED", "FAILED"
+        showStandardStreams = false
+    }
+    jvmArgs "-javaagent:${configurations.testRuntimeClasspath.find { it.name.contains('byte-buddy-agent') }?.absolutePath}"
+
+    afterSuite { desc, result ->
+        if (desc.parent == null) {
+            println "\n--------------------------------------------------"
+            println "Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} passed, ${result.failedTestCount} failed, ${result.skippedTestCount} skipped)"
+            println "--------------------------------------------------"
+        }
+    }
+
+
 }
