@@ -31,6 +31,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +52,7 @@ public class OrderServiceImpl implements OrderService {
   private final ItemRepository itemRepository;
   private final OrderMapper orderMapper;
   private final UserClientWrapper userClientWrapper;
+  private final Executor orderAsyncPool;
 
   @Override
   @Transactional
@@ -58,36 +62,19 @@ public class OrderServiceImpl implements OrderService {
       throw buildConflictException(ITEM_DUPLICATE);
     }
 
-    UserInfoResponseDto userInfo = userClientWrapper.getUserInfo(userId);
+    CompletableFuture<UserInfoResponseDto> userInfoFuture = requestUserInfoAsync(userId);
 
-    Order order = orderMapper.toOrder(userId);
+    Map<Long, Item> itemMap = getValidatedItemMap(dto.items());
+    List<OrderItem> orderItems = createOrderItems(dto.items(), itemMap);
+    double totalPrice = calculateTotalPrice(orderItems);
 
-    List<OrderItem> orderItems = new ArrayList<>();
-    double totalPrice = 0.0;
-
-    for (OrderItemRequestDto itemDto : dto.items()) {
-      Long itemId = itemDto.itemId();
-      Item item =
-          itemRepository
-              .findById(itemId)
-              .orElseThrow(
-                  () -> {
-                    log.warn("Order creation failed: Item not found | itemId={}", itemId);
-                    return buildNotFoundException(ITEM_NOT_FOUND, itemId);
-                  });
-
-      OrderItem orderItem = orderMapper.toOrderItem(itemDto, order, item);
-
-      orderItems.add(orderItem);
-
-      totalPrice += item.getPrice() * orderItem.getQuantity();
-    }
-
-    order.setOrderItems(orderItems);
-    order.setStatus(OrderStatus.NEW);
-    order.setTotalPrice(totalPrice);
+    Order order = orderMapper.toOrder(userId, orderItems, totalPrice, OrderStatus.NEW);
+    orderItems.forEach(item -> item.setOrder(order));
 
     Order savedOrder = orderRepository.save(order);
+
+    UserInfoResponseDto userInfo = userInfoFuture.join();
+
     log.info("Order created successfully | orderId={}", savedOrder.getId());
     return orderMapper.toOrderWithUserInfoResponseDto(savedOrder, userInfo);
   }
@@ -122,9 +109,11 @@ public class OrderServiceImpl implements OrderService {
   @Override
   @Transactional(readOnly = true)
   public UserOrdersResponseDto getByUserId(Long userId) {
-    UserInfoResponseDto userInfo = userClientWrapper.getUserInfo(userId);
+    CompletableFuture<UserInfoResponseDto> userInfoFuture = requestUserInfoAsync(userId);
 
     List<Order> orders = orderRepository.findAllByUserId(userId);
+
+    UserInfoResponseDto userInfo = userInfoFuture.join();
 
     return orderMapper.toUserOrdersDto(userInfo, orders);
   }
@@ -146,6 +135,8 @@ public class OrderServiceImpl implements OrderService {
                   return buildNotFoundException(ORDER_NOT_FOUND, orderId);
                 });
 
+    CompletableFuture<UserInfoResponseDto> userInfoFuture = requestUserInfoAsync(order.getUserId());
+
     if (order.getStatus() != OrderStatus.NEW) {
       log.warn(
           "Order update failed: Invalid order status | orderId={}, status={}",
@@ -154,52 +145,15 @@ public class OrderServiceImpl implements OrderService {
       throw buildBadRequestException(INVALID_ORDER_STATUS, orderId);
     }
 
-    UserInfoResponseDto userInfo = userClientWrapper.getUserInfo(order.getUserId());
-
-    List<OrderItem> currentOrderItems = order.getOrderItems();
-
-    List<OrderItem> itemsToRemove = new ArrayList<>();
-    double totalPrice = 0.0;
-
-    Map<Long, Integer> requestedItems =
-        dto.items().stream()
-            .collect(Collectors.toMap(OrderItemRequestDto::itemId, OrderItemRequestDto::quantity));
-
-    for (OrderItem existingOrderItem : currentOrderItems) {
-      Long itemId = existingOrderItem.getItem().getId();
-
-      if (requestedItems.containsKey(itemId)) {
-        existingOrderItem.setQuantity(requestedItems.get(itemId));
-        totalPrice += existingOrderItem.getQuantity() * existingOrderItem.getItem().getPrice();
-        requestedItems.remove(itemId);
-      } else {
-        itemsToRemove.add(existingOrderItem);
-      }
-    }
-
-    currentOrderItems.removeAll(itemsToRemove);
-
-    for (Map.Entry<Long, Integer> newOrderItem : requestedItems.entrySet()) {
-      Long itemId = newOrderItem.getKey();
-      Item item =
-          itemRepository
-              .findById(itemId)
-              .orElseThrow(
-                  () -> {
-                    log.warn("Order update failed: Item not found | itemId={}", itemId);
-                    return buildNotFoundException(ITEM_NOT_FOUND, itemId);
-                  });
-      OrderItem orderItem = orderMapper.toOrderItem(order, item, newOrderItem.getValue());
-      currentOrderItems.add(orderItem);
-      totalPrice += orderItem.getQuantity() * item.getPrice();
-    }
-
+    double totalPrice = updateOrderItems(order, dto.items());
     order.setTotalPrice(totalPrice);
 
     orderMapper.updateEntity(dto, order);
 
     Order updatedOrder = orderRepository.save(order);
     log.info("Order updated successfully | orderId={}", updatedOrder.getId());
+
+    UserInfoResponseDto userInfo = userInfoFuture.join();
 
     return orderMapper.toOrderWithUserInfoResponseDto(order, userInfo);
   }
@@ -235,5 +189,91 @@ public class OrderServiceImpl implements OrderService {
       }
     }
     return false;
+  }
+
+  private Long findMissingItemId(Set<Long> requestedIds, List<Item> foundItems) {
+    Set<Long> foundIds = foundItems.stream().map(Item::getId).collect(Collectors.toSet());
+
+    return requestedIds.stream().filter(id -> !foundIds.contains(id)).findFirst().orElseThrow();
+  }
+
+  private Map<Long, Item> getValidatedItemMap(List<OrderItemRequestDto> itemDtos) {
+    Set<Long> itemIds =
+        itemDtos.stream().map(OrderItemRequestDto::itemId).collect(Collectors.toSet());
+    return getValidatedItemMap(itemIds);
+  }
+
+  private List<OrderItem> createOrderItems(
+      List<OrderItemRequestDto> itemDtos, Map<Long, Item> itemMap) {
+    List<OrderItem> orderItems = new ArrayList<>();
+    for (OrderItemRequestDto itemDto : itemDtos) {
+      Item item = itemMap.get(itemDto.itemId());
+      orderItems.add(orderMapper.toOrderItem(itemDto, item));
+    }
+    return orderItems;
+  }
+
+  private double calculateTotalPrice(List<OrderItem> orderItems) {
+    return orderItems.stream()
+        .mapToDouble(item -> item.getItem().getPrice() * item.getQuantity())
+        .sum();
+  }
+
+  private Map<Long, Item> getValidatedItemMap(Set<Long> itemIds) {
+    List<Item> foundItems = itemRepository.findAllById(itemIds);
+
+    if (foundItems.size() != itemIds.size()) {
+      Long missingItem = findMissingItemId(itemIds, foundItems);
+      log.warn("Order creation failed: Item not found | itemId={}", missingItem);
+      throw buildNotFoundException(ITEM_NOT_FOUND, missingItem);
+    }
+
+    return foundItems.stream().collect(Collectors.toMap(Item::getId, Function.identity()));
+  }
+
+  private double updateOrderItems(Order order, List<OrderItemRequestDto> itemDtos) {
+    List<OrderItem> currentOrderItems = order.getOrderItems();
+    List<OrderItem> itemsToRemove = new ArrayList<>();
+    double totalPrice = 0.0;
+
+    Map<Long, Integer> requestedItems =
+        itemDtos.stream()
+            .collect(Collectors.toMap(OrderItemRequestDto::itemId, OrderItemRequestDto::quantity));
+
+    for (OrderItem existingOrderItem : currentOrderItems) {
+      Long itemId = existingOrderItem.getItem().getId();
+
+      if (requestedItems.containsKey(itemId)) {
+        existingOrderItem.setQuantity(requestedItems.get(itemId));
+        totalPrice += existingOrderItem.getQuantity() * existingOrderItem.getItem().getPrice();
+        requestedItems.remove(itemId);
+      } else {
+        itemsToRemove.add(existingOrderItem);
+      }
+    }
+
+    currentOrderItems.removeAll(itemsToRemove);
+
+    if (!requestedItems.isEmpty()) {
+      Map<Long, Item> newItemMap = getValidatedItemMap(requestedItems.keySet());
+
+      for (Map.Entry<Long, Integer> entry : requestedItems.entrySet()) {
+        Long itemId = entry.getKey();
+        Integer quantity = entry.getValue();
+
+        Item item = newItemMap.get(itemId);
+        OrderItem orderItem = orderMapper.toOrderItem(order, item, quantity);
+
+        currentOrderItems.add(orderItem);
+        totalPrice += orderItem.getQuantity() * item.getPrice();
+      }
+    }
+
+    return totalPrice;
+  }
+
+  private CompletableFuture<UserInfoResponseDto> requestUserInfoAsync(Long userId) {
+    return CompletableFuture.supplyAsync(
+        () -> userClientWrapper.getUserInfo(userId), orderAsyncPool);
   }
 }

@@ -18,7 +18,9 @@ public class FeignErrorDecoder implements ErrorDecoder {
 
   @Override
   public Exception decode(String methodKey, Response response) {
-    if (response.status() >= 500 && response.status() < 600) {
+    HttpStatus status = HttpStatus.valueOf(response.status());
+
+    if (status.is5xxServerError()) {
       return defaultErrorDecoder.decode(methodKey, response);
     }
 
@@ -27,7 +29,6 @@ public class FeignErrorDecoder implements ErrorDecoder {
 
         ExceptionResponseDTO errorResponse =
             objectMapper.readValue(bodyIs, ExceptionResponseDTO.class);
-        HttpStatus status = HttpStatus.valueOf(response.status());
         String message =
             errorResponse.message() != null ? errorResponse.message() : "Remote service error";
 

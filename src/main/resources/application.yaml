@@ -40,7 +40,12 @@ resilience4j:
         ignoreExceptions:
           - com.inno.orderservice.exception.BaseAppException
 
-
+app:
+  async:
+    core-pool-size: 4
+    max-pool-size: 10
+    queue-capacity: 25
+    keep-alive-seconds: 60
 
 logging:
   pattern:

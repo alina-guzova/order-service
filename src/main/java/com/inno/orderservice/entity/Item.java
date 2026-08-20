@@ -29,19 +29,19 @@ public class Item {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  Long id;
+  private Long id;
 
   @Column(name = "name", nullable = false)
-  String name;
+  private String name;
 
   @Column(name = "price", nullable = false)
-  Double price;
+  private Double price;
 
   @Column(name = "created_at", nullable = false, updatable = false)
   @CreatedDate
-  OffsetDateTime createdAt;
+  private OffsetDateTime createdAt;
 
   @Column(name = "updated_at", nullable = false)
   @LastModifiedDate
-  OffsetDateTime updatedAt;
+  private OffsetDateTime updatedAt;
 }

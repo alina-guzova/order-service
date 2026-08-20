@@ -17,8 +17,10 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import lombok.experimental.UtilityClass;
 
-public final class OrderTestData {
+@UtilityClass
+public class OrderTestData {
 
   // --- API Paths ---
   public static final String ORDERS_API_PATH = "/api/v1/orders";
@@ -63,8 +65,6 @@ public final class OrderTestData {
   public static final OrderStatus WRONG_STATUS = OrderStatus.DONE;
   public static final OffsetDateTime DEFAULT_CREATED_AT =
       OffsetDateTime.of(2026, 6, 6, 12, 0, 0, 0, ZoneOffset.UTC);
-
-  private OrderTestData() {}
 
   public static OrderItemRequestDto buildItemRequestDto() {
     return buildItemRequestDto(DEFAULT_ITEM_ID, DEFAULT_QUANTITY);
@@ -203,5 +203,9 @@ public final class OrderTestData {
 
   public static List<Order> buildOrderEntityList() {
     return List.of(buildOrderEntity());
+  }
+
+  public static List<OrderItem> buildOrderItemEntityList(Order order, Item item) {
+    return List.of(buildOrderItemEntity(order, item));
   }
 }

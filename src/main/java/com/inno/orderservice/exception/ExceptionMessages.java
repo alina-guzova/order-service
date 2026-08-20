@@ -1,9 +1,8 @@
 package com.inno.orderservice.exception;
 
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
+import lombok.experimental.UtilityClass;
 
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@UtilityClass
 public class ExceptionMessages {
   // Item exceptions
   public static final String ITEM_NOT_FOUND = "Failed to retrieve item with id = %d";

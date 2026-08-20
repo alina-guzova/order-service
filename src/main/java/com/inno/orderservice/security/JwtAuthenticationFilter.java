@@ -1,17 +1,13 @@
-package com.inno.orderservice.configuration;
+package com.inno.orderservice.security;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
-import javax.crypto.SecretKey;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,10 +15,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-  @Value("${application.security.jwt.secret-key}")
-  private String secretKey;
+  private final JwtService jwtService;
 
   @Override
   protected void doFilterInternal(
@@ -39,10 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     String jwt = authHeader.substring(7);
 
     try {
-      SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey));
-
-      Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(jwt).getPayload();
-
+      Claims claims = jwtService.extractAllClaims(jwt);
       Long userId = Long.valueOf(claims.getSubject());
       String role = claims.get("role", String.class);
 

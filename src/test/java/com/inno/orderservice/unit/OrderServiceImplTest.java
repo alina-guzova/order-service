@@ -3,7 +3,9 @@ package com.inno.orderservice.unit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -30,8 +32,12 @@ import com.inno.orderservice.repository.OrderRepository;
 import com.inno.orderservice.service.impl.OrderServiceImpl;
 import com.inno.orderservice.util.OrderTestData;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.Executor;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,8 +58,22 @@ class OrderServiceImplTest {
   @Mock private ItemRepository itemRepository;
   @Mock private UserClientWrapper userClientWrapper;
   @Mock private OrderMapper orderMapper;
+  @Mock private Executor orderAsyncPool;
 
   @InjectMocks private OrderServiceImpl orderService;
+
+  @BeforeEach
+  void setUp() {
+    lenient()
+        .doAnswer(
+            invocation -> {
+              Runnable task = invocation.getArgument(0);
+              task.run();
+              return null;
+            })
+        .when(orderAsyncPool)
+        .execute(any(Runnable.class));
+  }
 
   @Nested
   class CreateTests {
@@ -68,14 +88,17 @@ class OrderServiceImplTest {
       Order mappedOrder = OrderTestData.buildOrderEntity();
       Order savedOrder = OrderTestData.buildOrderEntity();
       OrderItem mappedOrderItem = OrderTestData.buildOrderItemEntity(mappedOrder, item);
+      List<OrderItem> orderItems = List.of(mappedOrderItem);
       OrderWithUserInfoResponseDto expectedResponse =
           OrderTestData.buildOrderWithUserInfoResponseDto();
 
       when(userClientWrapper.getUserInfo(userId)).thenReturn(userInfo);
-      when(orderMapper.toOrder(userId)).thenReturn(mappedOrder);
-      when(itemRepository.findById(OrderTestData.DEFAULT_ITEM_ID)).thenReturn(Optional.of(item));
-      when(orderMapper.toOrderItem(any(OrderItemRequestDto.class), eq(mappedOrder), eq(item)))
+      when(itemRepository.findAllById(any())).thenReturn(List.of(item));
+      when(orderMapper.toOrderItem(any(OrderItemRequestDto.class), eq(item)))
           .thenReturn(mappedOrderItem);
+      when(orderMapper.toOrder(
+              userId, orderItems, OrderTestData.DEFAULT_TOTAL_PRICE, OrderStatus.NEW))
+          .thenReturn(mappedOrder);
       when(orderRepository.save(mappedOrder)).thenReturn(savedOrder);
       when(orderMapper.toOrderWithUserInfoResponseDto(savedOrder, userInfo))
           .thenReturn(expectedResponse);
@@ -89,9 +112,9 @@ class OrderServiceImplTest {
       assertThat(mappedOrder.getTotalPrice()).isEqualTo(OrderTestData.DEFAULT_TOTAL_PRICE);
 
       verify(userClientWrapper).getUserInfo(userId);
-      verify(orderMapper).toOrder(userId);
-      verify(itemRepository).findById(OrderTestData.DEFAULT_ITEM_ID);
-      verify(orderMapper).toOrderItem(any(OrderItemRequestDto.class), eq(mappedOrder), eq(item));
+      verify(itemRepository).findAllById(any());
+      verify(orderMapper).toOrder(eq(userId), any(), anyDouble(), eq(OrderStatus.NEW));
+      verify(orderMapper).toOrderItem(any(OrderItemRequestDto.class), eq(item));
       verify(orderRepository).save(mappedOrder);
       verify(orderMapper).toOrderWithUserInfoResponseDto(savedOrder, userInfo);
     }
@@ -108,12 +131,9 @@ class OrderServiceImplTest {
           OrderTestData.buildCreateRequestDto(List.of(itemRequestDto));
 
       UserInfoResponseDto userInfo = OrderTestData.buildUserInfoResponseDto();
-      Order mappedOrder = OrderTestData.buildOrderEntity();
 
       when(userClientWrapper.getUserInfo(userId)).thenReturn(userInfo);
-      when(orderMapper.toOrder(userId)).thenReturn(mappedOrder);
-      when(itemRepository.findById(OrderTestData.NON_EXISTENT_ITEM_ID))
-          .thenReturn(Optional.empty());
+      when(itemRepository.findAllById(any())).thenReturn(Collections.emptyList());
 
       // when & then
       BaseAppException exception =
@@ -122,8 +142,7 @@ class OrderServiceImplTest {
       assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
 
       verify(userClientWrapper).getUserInfo(userId);
-      verify(orderMapper).toOrder(userId);
-      verify(itemRepository).findById(OrderTestData.NON_EXISTENT_ITEM_ID);
+      verify(itemRepository).findAllById(any());
       verifyNoMoreInteractions(itemRepository);
       verifyNoInteractions(orderRepository);
     }
@@ -368,7 +387,8 @@ class OrderServiceImplTest {
 
       when(orderRepository.findById(orderId)).thenReturn(Optional.of(existingOrder));
       when(userClientWrapper.getUserInfo(userId)).thenReturn(userInfo);
-      when(itemRepository.findById(OrderTestData.SECOND_ITEM_ID)).thenReturn(Optional.of(newItem));
+      when(itemRepository.findAllById(Set.of(OrderTestData.SECOND_ITEM_ID)))
+          .thenReturn(List.of(newItem));
       when(orderMapper.toOrderItem(existingOrder, newItem, OrderTestData.NEW_ITEM_QUANTITY))
           .thenReturn(mappedNewOrderItem);
       when(orderRepository.save(existingOrder)).thenReturn(existingOrder);
@@ -389,7 +409,7 @@ class OrderServiceImplTest {
 
       verify(orderRepository).findById(orderId);
       verify(userClientWrapper).getUserInfo(userId);
-      verify(itemRepository).findById(OrderTestData.SECOND_ITEM_ID);
+      verify(itemRepository).findAllById(Set.of(OrderTestData.SECOND_ITEM_ID));
       verify(orderMapper).toOrderItem(existingOrder, newItem, OrderTestData.NEW_ITEM_QUANTITY);
       verify(orderMapper).updateEntity(eq(requestDto), eq(existingOrder));
       verify(orderRepository).save(existingOrder);
@@ -540,7 +560,6 @@ class OrderServiceImplTest {
 
     verify(orderRepository).findById(orderId);
     verify(userClientWrapper).getUserInfo(userId);
-    verifyNoInteractions(itemRepository);
     verifyNoInteractions(orderMapper);
   }
 
@@ -562,10 +581,11 @@ class OrderServiceImplTest {
                     OrderTestData.NON_EXISTENT_ITEM_ID, OrderTestData.DEFAULT_QUANTITY)));
 
     UserInfoResponseDto userInfo = OrderTestData.buildUserInfoResponseDto();
+    Set<Long> expectedItemIds = Set.of(OrderTestData.NON_EXISTENT_ITEM_ID);
 
     when(orderRepository.findById(orderId)).thenReturn(Optional.of(existingOrder));
     when(userClientWrapper.getUserInfo(userId)).thenReturn(userInfo);
-    when(itemRepository.findById(OrderTestData.NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
+    when(itemRepository.findAllById(expectedItemIds)).thenReturn(Collections.emptyList());
 
     // when & then
     BaseAppException exception =
@@ -575,7 +595,7 @@ class OrderServiceImplTest {
 
     verify(orderRepository).findById(orderId);
     verify(userClientWrapper).getUserInfo(userId);
-    verify(itemRepository).findById(OrderTestData.NON_EXISTENT_ITEM_ID);
+    verify(itemRepository).findAllById(expectedItemIds);
     verifyNoMoreInteractions(itemRepository);
     verifyNoInteractions(orderMapper);
   }
@@ -606,7 +626,7 @@ class OrderServiceImplTest {
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
 
     verify(orderRepository).findById(orderId);
-    verifyNoInteractions(userClientWrapper);
+    verify(userClientWrapper).getUserInfo(userId);
     verifyNoInteractions(itemRepository);
     verifyNoInteractions(orderMapper);
   }

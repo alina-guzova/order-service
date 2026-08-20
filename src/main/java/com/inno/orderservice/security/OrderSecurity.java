@@ -1,4 +1,4 @@
-package com.inno.orderservice.util;
+package com.inno.orderservice.security;
 
 import com.inno.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;

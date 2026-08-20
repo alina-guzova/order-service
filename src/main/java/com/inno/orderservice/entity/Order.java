@@ -62,13 +62,13 @@ public class Order {
 
   @Builder.Default
   @Column(name = "deleted", nullable = false)
-  Boolean deleted = false;
+  private Boolean deleted = false;
 
   @Column(name = "created_at", nullable = false, updatable = false)
   @CreatedDate
-  OffsetDateTime createdAt;
+  private OffsetDateTime createdAt;
 
   @Column(name = "updated_at", nullable = false)
   @LastModifiedDate
-  OffsetDateTime updatedAt;
+  private OffsetDateTime updatedAt;
 }

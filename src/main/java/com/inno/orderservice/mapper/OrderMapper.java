@@ -10,6 +10,7 @@ import com.inno.orderservice.dto.response.UserOrdersResponseDto;
 import com.inno.orderservice.entity.Item;
 import com.inno.orderservice.entity.Order;
 import com.inno.orderservice.entity.OrderItem;
+import com.inno.orderservice.entity.OrderStatus;
 import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -19,15 +20,14 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface OrderMapper {
 
-  Order toOrder(Long userId);
+  Order toOrder(Long userId, List<OrderItem> orderItems, Double totalPrice, OrderStatus status);
 
   void updateEntity(OrderUpdateRequestDto dto, @MappingTarget Order entity);
 
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "quantity", source = "dto.quantity")
-  @Mapping(target = "order", source = "order")
   @Mapping(target = "item", source = "item")
-  OrderItem toOrderItem(OrderItemRequestDto dto, Order order, Item item);
+  OrderItem toOrderItem(OrderItemRequestDto dto, Item item);
 
   @Mapping(target = "id", ignore = true)
   OrderItem toOrderItem(Order order, Item item, Integer quantity);
