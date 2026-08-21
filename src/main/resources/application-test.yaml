@@ -1,0 +1,47 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: order-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:order_service_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%5p) %clr(${PID:- }){magenta} --- [%15.15t] %clr(%-40.40logger{36}){cyan} [%X{traceId:-none}] : %m%n"
+  level:
+    root: INFO
+
+application:
+  integration:
+    user-service:
+      url: http://localhost:8080
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY:8ify9bC8hqNAE3Y/A4SatBDXR539wGPO3AEFMrXKQwAv8uxQmgB7rwCHLgN7c3Oe8mZbQ7s+/DhKizAqDRjkXw==}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      userServiceClient:
+        failureRateThreshold: 100.0
+        slowCallRateThreshold: 100.0
+        minimumNumberOfCalls: 1000
+        waitDurationInOpenState: 1s
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+app:
+  async:
+    core-pool-size: 4
+    max-pool-size: 10
+    queue-capacity: 25
+    keep-alive-seconds: 60
