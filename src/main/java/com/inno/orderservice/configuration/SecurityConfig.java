@@ -1,6 +1,6 @@
 package com.inno.orderservice.configuration;
 
-import com.inno.orderservice.security.JwtAuthenticationFilter;
+import com.inno.orderservice.security.HeaderAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,7 +19,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-  private final JwtAuthenticationFilter jwtAuthFilter;
+  private final HeaderAuthenticationFilter headerAuthFilter;
   private final HandlerExceptionResolver handlerExceptionResolver;
 
   @Bean
@@ -41,7 +41,7 @@ public class SecurityConfig {
                               request, response, null, accessDeniedException);
                         }))
         .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(headerAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
   }

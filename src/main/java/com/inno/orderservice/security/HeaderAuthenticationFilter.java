@@ -1,13 +1,14 @@
 package com.inno.orderservice.security;
 
-import io.jsonwebtoken.Claims;
+import static com.inno.orderservice.util.ConfigConstants.USER_ID_HEADER;
+import static com.inno.orderservice.util.ConfigConstants.USER_ROLE_HEADER;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,40 +16,35 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
-@RequiredArgsConstructor
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
-  private final JwtService jwtService;
+public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
-    String authHeader = request.getHeader("Authorization");
+    String userIdHeader = request.getHeader(USER_ID_HEADER);
+    String roleHeader = request.getHeader(USER_ROLE_HEADER);
 
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      filterChain.doFilter(request, response);
-      return;
-    }
+    if (userIdHeader != null
+        && !userIdHeader.isBlank()
+        && roleHeader != null
+        && !roleHeader.isBlank()
+        && SecurityContextHolder.getContext().getAuthentication() == null) {
+      try {
+        Long userId = Long.valueOf(userIdHeader);
 
-    String jwt = authHeader.substring(7);
-
-    try {
-      Claims claims = jwtService.extractAllClaims(jwt);
-      Long userId = Long.valueOf(claims.getSubject());
-      String role = claims.get("role", String.class);
-
-      if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-        var authority = new SimpleGrantedAuthority("ROLE_" + role);
+        String fullRole = roleHeader.startsWith("ROLE_") ? roleHeader : "ROLE_" + roleHeader;
+        var authority = new SimpleGrantedAuthority(fullRole);
 
         var authToken =
             new UsernamePasswordAuthenticationToken(
                 userId, null, Collections.singletonList(authority));
+
         SecurityContextHolder.getContext().setAuthentication(authToken);
+      } catch (Exception e) {
+        SecurityContextHolder.clearContext();
       }
-    } catch (Exception ex) {
-      SecurityContextHolder.clearContext();
     }
 
     filterChain.doFilter(request, response);
