@@ -8,7 +8,4 @@ spring:
 application:
   integration:
     user-service:
-      url: http://user-service-app:8080
-  security:
-    jwt:
-      secret-key: ${JWT_SECRET_KEY:8ify9bC8hqNAE3Y/A4SatBDXR539wGPO3AEFMrXKQwAv8uxQmgB7rwCHLgN7c3Oe8mZbQ7s+/DhKizAqDRjkXw==}
+      url: ${USER_SERVICE_URL:http://user-app:8080}

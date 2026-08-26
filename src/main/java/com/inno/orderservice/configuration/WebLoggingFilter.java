@@ -1,5 +1,8 @@
 package com.inno.orderservice.configuration;
 
+import static com.inno.orderservice.util.ConfigConstants.TRACE_ID_HEADER;
+import static com.inno.orderservice.util.ConfigConstants.TRACE_ID_KEY;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,8 +21,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class WebLoggingFilter extends OncePerRequestFilter {
 
-  private static final String TRACE_ID_KEY = "traceId";
-
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -27,7 +28,12 @@ public class WebLoggingFilter extends OncePerRequestFilter {
 
     long startTime = System.currentTimeMillis();
 
-    String traceId = UUID.randomUUID().toString().substring(0, 8);
+    String traceId = request.getHeader(TRACE_ID_HEADER);
+
+    if (traceId == null || traceId.isEmpty()) {
+      traceId = UUID.randomUUID().toString().substring(0, 8);
+    }
+
     MDC.put(TRACE_ID_KEY, traceId);
 
     String requestUri = request.getRequestURI();
