@@ -15,6 +15,13 @@ spring:
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9094,localhost:9095}
+    consumer:
+      group-id: ${KAFKA_ORDER_GROUP:order-service-group}
+    template:
+      topic-payment: ${KAFKA_PAYMENT_TOPIC:payment-events}
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%5p) %clr(${PID:- }){magenta} --- [%15.15t] %clr(%-40.40logger{36}){cyan} [%X{traceId:-none}] : %m%n"
