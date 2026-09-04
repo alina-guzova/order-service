@@ -220,7 +220,7 @@ class OrderControllerIT extends BaseIntegrationTest {
       Item item = itemRepository.save(OrderTestData.buildItemEntityWithoutId());
 
       Order matchingOrder = OrderTestData.buildOrderEntityWithoutId();
-      matchingOrder.setStatus(OrderStatus.NEW);
+      matchingOrder.setStatus(OrderStatus.PENDING);
       OrderItem matchingItem = OrderTestData.buildOrderItemEntity(matchingOrder, item);
       matchingOrder.setOrderItems(new ArrayList<>(List.of(matchingItem)));
       orderRepository.save(matchingOrder);

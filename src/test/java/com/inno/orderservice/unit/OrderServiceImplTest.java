@@ -97,7 +97,7 @@ class OrderServiceImplTest {
       when(orderMapper.toOrderItem(any(OrderItemRequestDto.class), eq(item)))
           .thenReturn(mappedOrderItem);
       when(orderMapper.toOrder(
-              userId, orderItems, OrderTestData.DEFAULT_TOTAL_PRICE, OrderStatus.NEW))
+              userId, orderItems, OrderTestData.DEFAULT_TOTAL_PRICE, OrderStatus.PENDING))
           .thenReturn(mappedOrder);
       when(orderRepository.save(mappedOrder)).thenReturn(savedOrder);
       when(orderMapper.toOrderWithUserInfoResponseDto(savedOrder, userInfo))
@@ -108,12 +108,12 @@ class OrderServiceImplTest {
 
       // then
       assertThat(actualResponse).isNotNull().isEqualTo(expectedResponse);
-      assertThat(mappedOrder.getStatus()).isEqualTo(OrderStatus.NEW);
+      assertThat(mappedOrder.getStatus()).isEqualTo(OrderStatus.PENDING);
       assertThat(mappedOrder.getTotalPrice()).isEqualTo(OrderTestData.DEFAULT_TOTAL_PRICE);
 
       verify(userClientWrapper).getUserInfo(userId);
       verify(itemRepository).findAllById(any());
-      verify(orderMapper).toOrder(eq(userId), any(), anyDouble(), eq(OrderStatus.NEW));
+      verify(orderMapper).toOrder(eq(userId), any(), anyDouble(), eq(OrderStatus.PENDING));
       verify(orderMapper).toOrderItem(any(OrderItemRequestDto.class), eq(item));
       verify(orderRepository).save(mappedOrder);
       verify(orderMapper).toOrderWithUserInfoResponseDto(savedOrder, userInfo);
@@ -639,7 +639,7 @@ class OrderServiceImplTest {
       // given
       Long orderId = OrderTestData.DEFAULT_ORDER_ID;
       Order order = OrderTestData.buildOrderEntity();
-      order.setStatus(OrderStatus.NEW);
+      order.setStatus(OrderStatus.PENDING);
 
       when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 

@@ -58,10 +58,11 @@ public class OrderTestData {
   public static final String DEFAULT_USER_NAME = "Alice";
   public static final String DEFAULT_USER_SURNAME = "Britt";
   public static final String DEFAULT_USER_EMAIL = "alice@gmail.com";
+  public static final String DEFAULT_PAYMENT_ID = "pay-123";
   public static final LocalDate DEFAULT_BIRTH_DATE = LocalDate.of(2000, 1, 23);
   public static final LocalDate MIN_DATE = LocalDate.of(2026, 1, 1);
   public static final LocalDate MAX_DATE = LocalDate.of(2026, 12, 31);
-  public static final OrderStatus TARGET_STATUS = OrderStatus.NEW;
+  public static final OrderStatus TARGET_STATUS = OrderStatus.PENDING;
   public static final OrderStatus WRONG_STATUS = OrderStatus.DONE;
   public static final OffsetDateTime DEFAULT_CREATED_AT =
       OffsetDateTime.of(2026, 6, 6, 12, 0, 0, 0, ZoneOffset.UTC);
@@ -129,7 +130,7 @@ public class OrderTestData {
     return Order.builder()
         .id(DEFAULT_ORDER_ID)
         .userId(DEFAULT_USER_ID)
-        .status(OrderStatus.NEW)
+        .status(OrderStatus.PENDING)
         .totalPrice(DEFAULT_TOTAL_PRICE)
         .deleted(false)
         .createdAt(OffsetDateTime.now())
@@ -168,7 +169,7 @@ public class OrderTestData {
   public static OrderResponseDto buildOrderResponseDto() {
     return OrderResponseDto.builder()
         .id(DEFAULT_ORDER_ID)
-        .status(OrderStatus.NEW)
+        .status(OrderStatus.PENDING)
         .totalPrice(DEFAULT_TOTAL_PRICE)
         .items(List.of(buildItemResponseDto()))
         .createdAt(OffsetDateTime.now())
@@ -179,7 +180,7 @@ public class OrderTestData {
   public static Order buildOrderEntityWithoutId() {
     return Order.builder()
         .userId(DEFAULT_USER_ID)
-        .status(OrderStatus.NEW)
+        .status(OrderStatus.PENDING)
         .totalPrice(DEFAULT_TOTAL_PRICE)
         .deleted(false)
         .createdAt(OffsetDateTime.now())
