@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: dev
+data:
+  SPRING_PROFILES_ACTIVE: docker
+  DB_PORT: "5432"
+  DB_HOST: order-service-db-service
+  DB_NAME: order_service_db
+
+  KAFKA_1_HOST: kafka-0.kafka-service
+  KAFKA_1_PORT: "9092"
+  KAFKA_2_HOST: kafka-1.kafka-service
+  KAFKA_2_PORT: "9092"
+  KAFKA_3_HOST: kafka-2.kafka-service
+  KAFKA_3_PORT: "9092"
+
+  USER_SERVICE_URL: http://user-service:8080
