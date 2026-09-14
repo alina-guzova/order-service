@@ -40,7 +40,12 @@ public class SecurityConfig {
                           handlerExceptionResolver.resolveException(
                               request, response, null, accessDeniedException);
                         }))
-        .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers("/actuator/**", "/actuator/health/**")
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated())
         .addFilterBefore(headerAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();

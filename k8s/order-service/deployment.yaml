@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-deployment
+  namespace: dev
+  labels:
+    app: order-service
+    env: dev
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+
+  selector:
+    matchLabels:
+      app: order-service
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+        - name: order-service-container
+          image: order-service:latest
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: order-service-config
+            - secretRef:
+                name: order-service-secret
+          ports:
+            - name: http-port
+              containerPort: 8082
+
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http-port
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 26
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http-port
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http-port
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
