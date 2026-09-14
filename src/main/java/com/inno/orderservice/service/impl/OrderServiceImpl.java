@@ -22,6 +22,7 @@ import com.inno.orderservice.entity.OrderItem;
 import com.inno.orderservice.entity.OrderStatus;
 import com.inno.orderservice.integration.UserClientWrapper;
 import com.inno.orderservice.mapper.OrderMapper;
+import com.inno.orderservice.model.PaymentStatus;
 import com.inno.orderservice.repository.ItemRepository;
 import com.inno.orderservice.repository.OrderRepository;
 import com.inno.orderservice.repository.specification.OrderSpecifications;
@@ -68,7 +69,7 @@ public class OrderServiceImpl implements OrderService {
     List<OrderItem> orderItems = createOrderItems(dto.items(), itemMap);
     double totalPrice = calculateTotalPrice(orderItems);
 
-    Order order = orderMapper.toOrder(userId, orderItems, totalPrice, OrderStatus.NEW);
+    Order order = orderMapper.toOrder(userId, orderItems, totalPrice, OrderStatus.PENDING);
     orderItems.forEach(item -> item.setOrder(order));
 
     Order savedOrder = orderRepository.save(order);
@@ -137,7 +138,7 @@ public class OrderServiceImpl implements OrderService {
 
     CompletableFuture<UserInfoResponseDto> userInfoFuture = requestUserInfoAsync(order.getUserId());
 
-    if (order.getStatus() != OrderStatus.NEW) {
+    if (order.getStatus() != OrderStatus.PENDING) {
       log.warn(
           "Order update failed: Invalid order status | orderId={}, status={}",
           orderId,
@@ -170,7 +171,7 @@ public class OrderServiceImpl implements OrderService {
                   return buildNotFoundException(ORDER_NOT_FOUND, orderId);
                 });
 
-    if (order.getStatus() != OrderStatus.NEW) {
+    if (order.getStatus() != OrderStatus.PENDING) {
       log.warn(
           "Order delete failed: Invalid order status | orderId={}, status={}",
           orderId,
@@ -179,6 +180,35 @@ public class OrderServiceImpl implements OrderService {
     }
 
     orderRepository.delete(order);
+  }
+
+  @Override
+  @Transactional
+  public void updateOrderStatus(Long orderId, PaymentStatus status) {
+    Order order =
+        orderRepository
+            .findById(orderId)
+            .orElseThrow(
+                () -> {
+                  log.warn("Order status update failed: Order not found | orderId={}", orderId);
+                  return buildNotFoundException(ORDER_NOT_FOUND, orderId);
+                });
+
+    if (order.getStatus() != OrderStatus.PENDING) {
+      log.warn(
+          "Order status update skipped: Invalid order status | orderId={}, currentStatus={}",
+          orderId,
+          order.getStatus());
+      return;
+    }
+
+    if (status == PaymentStatus.SUCCESS) {
+      order.setStatus(OrderStatus.IN_PROGRESS);
+
+      orderRepository.save(order);
+
+      log.info("Order status updated successfully | orderId={}, status={}", orderId, status);
+    }
   }
 
   private boolean hasDuplicateItems(List<OrderItemRequestDto> items) {

@@ -31,8 +31,10 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
@@ -54,6 +56,8 @@ class OrderControllerIT extends BaseIntegrationTest {
   @Autowired private ItemRepository itemRepository;
 
   @Autowired private CircuitBreakerRegistry circuitBreakerRegistry;
+
+  @Mock private KafkaTemplate<String, Object> kafkaTemplate;
 
   @BeforeEach
   void setUp() {
@@ -220,7 +224,7 @@ class OrderControllerIT extends BaseIntegrationTest {
       Item item = itemRepository.save(OrderTestData.buildItemEntityWithoutId());
 
       Order matchingOrder = OrderTestData.buildOrderEntityWithoutId();
-      matchingOrder.setStatus(OrderStatus.NEW);
+      matchingOrder.setStatus(OrderStatus.PENDING);
       OrderItem matchingItem = OrderTestData.buildOrderItemEntity(matchingOrder, item);
       matchingOrder.setOrderItems(new ArrayList<>(List.of(matchingItem)));
       orderRepository.save(matchingOrder);
@@ -236,12 +240,12 @@ class OrderControllerIT extends BaseIntegrationTest {
           .perform(
               org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
                       OrderTestData.ORDERS_API_PATH)
-                  .param("status", "NEW")
+                  .param("status", "PENDING")
                   .with(userAuth(OrderTestData.DEFAULT_USER_ID, ADMIN)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.content", hasSize(1)))
           .andExpect(jsonPath("$.content[0].id", is(matchingOrder.getId().intValue())))
-          .andExpect(jsonPath("$.content[0].status", is("NEW")));
+          .andExpect(jsonPath("$.content[0].status", is("PENDING")));
     }
 
     @Test

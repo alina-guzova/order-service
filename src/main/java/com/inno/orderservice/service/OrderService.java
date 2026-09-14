@@ -6,6 +6,7 @@ import com.inno.orderservice.dto.request.OrderUpdateRequestDto;
 import com.inno.orderservice.dto.response.OrderResponseDto;
 import com.inno.orderservice.dto.response.OrderWithUserInfoResponseDto;
 import com.inno.orderservice.dto.response.UserOrdersResponseDto;
+import com.inno.orderservice.model.PaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -22,4 +23,6 @@ public interface OrderService {
   OrderWithUserInfoResponseDto update(Long orderId, OrderUpdateRequestDto dto);
 
   void delete(Long orderId);
+
+  void updateOrderStatus(Long orderId, PaymentStatus status);
 }

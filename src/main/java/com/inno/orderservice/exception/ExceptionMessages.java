@@ -10,5 +10,5 @@ public class ExceptionMessages {
 
   // Order exceptions
   public static final String ORDER_NOT_FOUND = "Failed to retrieve order with id = %d";
-  public static final String INVALID_ORDER_STATUS = "Order status must be NEW, order id = %d";
+  public static final String INVALID_ORDER_STATUS = "Order status must be PENDING, order id = %d";
 }

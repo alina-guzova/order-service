@@ -52,3 +52,4 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%5p) %clr(${PID:- }){magenta} --- [%15.15t] %clr(%-40.40logger{36}){cyan} [%X{traceId:-none}] : %m%n"
   level:
     root: INFO
+    org.apache.kafka.clients.NetworkClient: WARN

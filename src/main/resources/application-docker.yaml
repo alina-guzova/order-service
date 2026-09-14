@@ -5,6 +5,13 @@ spring:
     password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
 
+  kafka:
+    bootstrap-servers: ${KAFKA_1_HOST:kafka-1}:${KAFKA_1_PORT:9092},${KAFKA_2_HOST:kafka-2}:${KAFKA_2_PORT:9094},${KAFKA_3_HOST:kafka-3}:${KAFKA_3_PORT:9095}
+    consumer:
+      group-id: ${KAFKA_ORDER_GROUP:order-service-group}
+    template:
+      topic-payment: ${KAFKA_PAYMENT_TOPIC:payment-events}
+
 application:
   integration:
     user-service:
